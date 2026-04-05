@@ -1,128 +1,41 @@
-# 🗃️ wacli — WhatsApp CLI: sync, search, send.
+# Wacli for Windows 🪟
 
-WhatsApp CLI built on top of `whatsmeow`, focused on:
+This is a Windows-compatible fork of the original **[wacli](https://github.com/steipete/wacli)** by [steipete](https://github.com/steipete). 
 
-- Best-effort local sync of message history + continuous capture
-- Fast offline search
-- Sending messages
-- Contact + group management
+## 🚀 The Achievement
+The original `wacli` is a powerful CLI tool for WhatsApp automation, but it was previously incompatible with Windows due to its reliance on Unix-specific system calls for file locking. **I, Yasir Amin Brohi, modified the core locking mechanism to support the Windows API**, allowing developers on Windows to finally use this robust tool natively.
 
-This is a third-party tool that uses the WhatsApp Web protocol via `whatsmeow` and is not affiliated with WhatsApp.
+## 🛠️ The Problem
+The original code used `syscall.Flock`, which is not available in the Windows environment. This caused the build to fail with `undefined: syscall.Flock` errors, preventing Windows users from compiling or running the tool.
 
-## Status
+## 💡 The Solution
+I refactored the `internal/lock/lock.go` file to:
+1.  Detect the operating system at runtime.
+2.  Use `golang.org/x/sys/windows` and the `LockFileEx` / `UnlockFileEx` API for Windows environments.
+3.  Maintain backward compatibility for Unix-based systems using the original `syscall.Flock`.
 
-Core implementation is in place. See `docs/spec.md` for the full design notes.
+## 📂 Files Changed
+*   **`internal/lock/lock.go`**: Completely rewritten to handle cross-platform file locking.
+*   **`go.mod`**: Added `golang.org/x/sys` dependency to support Windows API calls.
 
-## Recent updates (0.2.0)
+## 📋 How to Build
+1.  Ensure you have **Go (1.25+)** installed.
+2.  Clone this repository:
+    ```bash
+    git clone https://github.com/YasirAminBrohi/wacli_window.git
+    cd wacli_window
+    ```
+3.  Build the executable:
+    ```bash
+    go build -o wacli.exe ./cmd/wacli
+    ```
 
-- Messages: search/list includes display text for reactions, replies, and media types.
-- Send: `wacli send file --filename` to override the display name.
-- Auth: optional `WACLI_DEVICE_LABEL` / `WACLI_DEVICE_PLATFORM` env overrides.
+## 🔐 Authentication
+Run `./wacli.exe auth` to link your WhatsApp account via QR code. Your session will be securely stored in your user directory (`%USERPROFILE%\.wacli`).
 
-## Install / Build
+## 🙏 Credits
+*   Original Project: [steipete/wacli](https://github.com/steipete/wacli)
+*   Windows Port & Fixes: **Yasir Amin Brohi**
 
-Choose **one** of the following options.  
-If you install via Homebrew, you can skip the local build step.
-
-### Option A: Install via Homebrew (tap)
-
-- `brew install steipete/tap/wacli`
-
-### Option B: Build locally
-
-- `go build -tags sqlite_fts5 -o ./dist/wacli ./cmd/wacli`
-
-Run (local build only):
-
-- `./dist/wacli --help`
-
-## Quick start
-
-Default store directory is `~/.wacli` (override with `--store DIR`).
-
-```bash
-# 1) Authenticate (shows QR), then bootstrap sync
-pnpm wacli auth
-# or: ./dist/wacli auth (after pnpm build)
-
-# 2) Keep syncing (never shows QR; requires prior auth)
-pnpm wacli sync --follow
-
-# Diagnostics
-pnpm wacli doctor
-
-# Search messages
-pnpm wacli messages search "meeting"
-
-# Backfill older messages for a chat (best-effort; requires your primary device online)
-pnpm wacli history backfill --chat 1234567890@s.whatsapp.net --requests 10 --count 50
-
-# Download media for a message (after syncing)
-./wacli media download --chat 1234567890@s.whatsapp.net --id <message-id>
-
-# Send a message
-pnpm wacli send text --to 1234567890 --message "hello"
-
-# Send a file
-./wacli send file --to 1234567890 --file ./pic.jpg --caption "hi"
-# Or override display name
-./wacli send file --to 1234567890 --file /tmp/abc123 --filename report.pdf
-
-# List groups and manage participants
-pnpm wacli groups list
-pnpm wacli groups rename --jid 123456789@g.us --name "New name"
-```
-
-## Prior Art / Credit
-
-This project is heavily inspired by (and learns from) the excellent `whatsapp-cli` by Vicente Reig:
-
-- [`whatsapp-cli`](https://github.com/vicentereig/whatsapp-cli)
-
-## High-level UX
-
-- `wacli auth`: interactive login (shows QR code), then immediately performs initial data sync.
-- `wacli sync`: non-interactive sync loop (never shows QR; errors if not authenticated).
-- Output is human-readable by default; pass `--json` for machine-readable output.
-
-## Storage
-
-Defaults to `~/.wacli` (override with `--store DIR`).
-
-## Environment overrides
-
-- `WACLI_DEVICE_LABEL`: set the linked device label (shown in WhatsApp).
-- `WACLI_DEVICE_PLATFORM`: override the linked device platform (defaults to `CHROME` if unset or invalid).
-
-## Backfilling older history
-
-`wacli sync` stores whatever WhatsApp Web sends opportunistically. To try to fetch *older* messages, use on-demand history sync requests to your **primary device** (your phone).
-
-Important notes:
-
-- This is **best-effort**: WhatsApp may not return full history.
-- Your **primary device must be online**.
-- Requests are **per chat** (DM or group). `wacli` uses the *oldest locally stored message* in that chat as the anchor.
-- Recommended `--count` is `50` per request.
-
-### Backfill one chat
-
-```bash
-pnpm wacli history backfill --chat 1234567890@s.whatsapp.net --requests 10 --count 50
-```
-
-### Backfill all chats (script)
-
-This loops through chats already known in your local DB:
-
-```bash
-pnpm -s wacli -- --json chats list --limit 100000 \
-  | jq -r '.[].JID' \
-  | while read -r jid; do
-      pnpm -s wacli -- history backfill --chat "$jid" --requests 3 --count 50
-    done
-```
-
-## License
-
-See `LICENSE`.
+---
+*Built with passion by a BSCS student at FAST Karachi.* 💻🇵🇰
