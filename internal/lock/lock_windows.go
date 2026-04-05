@@ -1,10 +1,11 @@
+//go:build windows
+
 package lock
 
 import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"time"
 
@@ -26,20 +27,18 @@ func Acquire(storeDir string) (*Lock, error) {
 		return nil, fmt.Errorf("open lock file: %w", err)
 	}
 
-	if runtime.GOOS == "windows" {
-		handle := windows.Handle(f.Fd())
-		var overlapped windows.Overlapped
-		err := windows.LockFileEx(handle, windows.LOCKFILE_EXCLUSIVE_LOCK|windows.LOCKFILE_FAIL_IMMEDIATELY, 0, 1, 0, &overlapped)
-		if err != nil {
-			_, _ = f.Seek(0, 0)
-			b, _ := os.ReadFile(path)
-			_ = f.Close()
-			info := strings.TrimSpace(string(b))
-			if info != "" {
-				return nil, fmt.Errorf("store is locked (another wacli is running?): %w (%s)", err, info)
-			}
-			return nil, fmt.Errorf("store is locked (another wacli is running?): %w", err)
+	handle := windows.Handle(f.Fd())
+	var overlapped windows.Overlapped
+	err = windows.LockFileEx(handle, windows.LOCKFILE_EXCLUSIVE_LOCK|windows.LOCKFILE_FAIL_IMMEDIATELY, 0, 1, 0, &overlapped)
+	if err != nil {
+		_, _ = f.Seek(0, 0)
+		b, _ := os.ReadFile(path)
+		_ = f.Close()
+		info := strings.TrimSpace(string(b))
+		if info != "" {
+			return nil, fmt.Errorf("store is locked (another wacli is running?): %w (%s)", err, info)
 		}
+		return nil, fmt.Errorf("store is locked (another wacli is running?): %w", err)
 	}
 
 	_ = f.Truncate(0)
@@ -54,11 +53,9 @@ func (l *Lock) Release() error {
 	if l == nil || l.f == nil {
 		return nil
 	}
-	if runtime.GOOS == "windows" {
-		handle := windows.Handle(l.f.Fd())
-		var overlapped windows.Overlapped
-		_ = windows.UnlockFileEx(handle, 0, 1, 0, &overlapped)
-	}
+	handle := windows.Handle(l.f.Fd())
+	var overlapped windows.Overlapped
+	_ = windows.UnlockFileEx(handle, 0, 1, 0, &overlapped)
 	err := l.f.Close()
 	l.f = nil
 	return err
